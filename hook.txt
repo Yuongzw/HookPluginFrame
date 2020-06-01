@@ -1,0 +1,23 @@
+Hook 基础
+1、替换 （把系统里面的 替换成 动态代理）
+2、添加动态代理（做我们自己的逻辑）
+
+
+hook 系统源码 TestActivity 没有在manifest文件中注册也能启动
+startActivity --> TestActivity --> hook --> AMS 检测
+hook：把TestActivity 替换成我们真实有效的Activity来绕过AMS的检测，等检测完成后再替换回来
+
+                                                                                     (8.0 - 9.0是ActivityManager.getService()) 返回一个IActivityManager
+                                                                                     (8.0以下是ActivityManagerNative.getDefault()) 返回一个IActivityManager
+startActivity --> startActivityForResult -->  mInstrumentation.execStartActivity --> ActivityTaskManager.getService() 返回一个IActivityTaskManager
+--> IActivityTaskManager.startActivity --> AMS.startActivity(检测当前的Activity是否在manifest文件中注册)
+
+切入点：既然会得到 IActivityTaskManager(8.0以上，8.0以下是IActivityManager)，设置新的IActivityTaskManager(8.0以上，8.0以下是IActivityManager)（寻找替换点(动态代理)）
+动态代理：在执行 AMS.startActivity之前我们需要执行自己的代码(把TestActivity替换成已经注册的Activity即ProxyActivity)
+
+AMS 检查过后   要把ProxyActivity -->  替换回 TestActivity
+
+AMS检查过后 ActivityThread 即将加载启动Activity，我们要在ActivityThread加载Activity之前完成替换工作
+
+hook: 因为 ActivityThread 启动Activity是在handler的handleMessage方法中回调的，所以我们要在它之前执行。
+

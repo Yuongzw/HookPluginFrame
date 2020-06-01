@@ -1,0 +1,74 @@
+宿主跳转宿主的 Activity    ok
+宿主跳转插件的 Activity    失败
+
+分析错误原因：
+ Caused by: java.lang.ClassNotFoundException: Didn't find class "com.yuong.plugin.PluginActivity"
+ on path: DexPathList[[zip file "/data/app/com.yuong.hookprojectdemo-ZIb2kLSaSta1uAxSO35hHg==/base.apk"],
+ nativeLibraryDirectories=[/data/app/com.yuong.hookprojectdemo-ZIb2kLSaSta1uAxSO35hHg==/lib/arm64, /system/lib64, /product/lib64]]
+
+ startActivity() --> 绕过AMS检测  --> ActivityThread(把代理的Activity换回来) --> 要去实例化Activity (报错)
+
+ Activity.startActivity() --> Instrumentation.execStartActivity() --> AMS检查 --> ActivityThread(即将加载Activity)
+ --> handleLaunchActivity() --> performLaunchActivity() --> Instrumentation.newActivity() 参数中有个ClassLoader -->
+
+分析Android中的ClassLoader
+    1、Java中的ClassLoader和Android中的ClassLoader是不一样的
+    2、performLaunchActivity() java.lang.ClassLoader cl = appContext.getClassLoader(); 方法中的ClassLoader == PathClassLoader
+    3、(Activity) cl.loadClass(className).newInstance();（cl = PathClassLoader）
+
+PathClassLoader.loadClass() --> BaseDexClassLoader.loadClass()  --> ClassLoader.loadClass() --> ClassLoader.findClass()
+-->BaseDexClassLoader.findClass() --> DexPathList.findClass() --> Element.findClass()(Element是DexPathList的静态内部类)
+--> dexFile.loadClassBinaryName() 通过 jni层调用返回一个类
+
+BaseDexClassLoader.findClass() -->  Class c = pathList.findClass(name, suppressedExceptions); 这里的 c 为什么为空
+
+遍历 dexElements
+for (Element element : dexElements) {
+    Class<?> clazz = element.findClass(name, definingContext, suppressed);
+    if (clazz != null) {
+      return clazz;
+   }
+}
+
+public Class<?> findClass(String name, ClassLoader definingContext,
+                List<Throwable> suppressed) {
+   return dexFile != null ? dexFile.loadClassBinaryName(name, definingContext, suppressed)
+                    : null;
+}
+
+Element 是什么？ 为什么 Element.dexFile == null ?
+我们apk文件中的 dex 文件就是 Element，dexFile就是dex文件中的可执行文件
+
+为什么我们跳转插件的Activity为报上面的错？
+原因是我们的 dexElements 数组也就是 dex文件数组没有我们插件apk 的Dex文件，所以就找不到插件里面的类，才会报错。
+
+解决方案：
+要把插件的 dexElements跟我们的宿主的 dexElements 融合成一个新的 dexElements，这样我们就可以加载插件当中的类了
+
+hook式插件化：无需使用宿主当中的环境
+
+占位式/插桩式：插件的APP必须使用宿主当中的环境
+
+分析Android中的ClassLoader
+    1、Java中的ClassLoader和Android中的ClassLoader是不一样的
+    2、Android的ClassLoader分为两类：①系统提供的ClassLoader ---> BootClassLoader，PathClassLoader，DexClassLoader
+                                    ②自定义ClassLoader
+
+    给系统预加载使用的：BootClassLoader
+    给系统程序及应用程序 加载Class：PathClassLoader
+    加载Dex文件的：DexClassLoader
+
+手机开机流程：
+    1、内核启动
+    2、启动init进程（第一个进程）
+    3、启动zygote进程
+        ZygoteInit --> 初始化 BootClassLoader PathClassLoader
+           ZygoteInit.main() --> preLoad() --> preloadClasses() --> Class.forName(line, true, null) -->
+           loader = BootClassLoader.getInstance() (BootClassLoader 在这里初始化)
+
+           ZygoteInit.main() --> forkSystemServer() --> handleSystemServerProcess() --> createSystemServerClassLoader() -->
+           createPathClassLoader() --> ClassLoaderFactory.createClassLoader() --> createClassLoader() -->
+           new PathClassLoader(dexPath, librarySearchPath, parent, arrayOfSharedLibraries); (PathClassLoader 在这里初始化)
+
+    4、zygote进程孵化SystemServer进程
+    5、SystemServer会启动很多服务，比如PMS、AMS等
