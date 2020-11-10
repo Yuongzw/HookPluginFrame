@@ -3,6 +3,7 @@ package com.yuong.plugin.base;
 import android.app.Activity;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import androidx.appcompat.app.AppCompatActivity;
 
 public abstract class BaseActivity extends Activity {
 

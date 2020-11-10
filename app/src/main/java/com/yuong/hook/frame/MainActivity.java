@@ -20,6 +20,7 @@ import android.os.Message;
 import android.view.View;
 import android.widget.Toast;
 
+import com.yuong.hook.frame.manager.HookManager;
 import com.yuong.hook.frame.manager.PluginManager;
 
 import java.io.File;
@@ -29,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     //是否加载完成
     private boolean isLoadSuccess = false;
 
-    private String path = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "plugin2.apk";
+    private String path = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "plugin.apk";
     @SuppressLint("HandlerLeak")
     private Handler handler = new Handler() {
         @Override
@@ -63,10 +64,25 @@ public class MainActivity extends AppCompatActivity {
             if (ContextCompat.checkSelfPermission(this,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE}, 666);
+                ActivityCompat.requestPermissions(this, new String[]{
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE}, 666);
             } else {
                 showProgress();
-                PluginManager.getInstance(this).pluginToApp(handler, path);
+                try {
+                    if (!MyApplication.isHookSystemApi) {
+                        HookManager.getInstance(getApplication()).hookAMSAction();
+                        HookManager.getInstance(getApplication()).hookLaunchActivity();
+                        MyApplication.isHookSystemApi = true;
+                    }
+                    PluginManager.getInstance(getApplication()).pluginToApp(handler, path);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    if (dialog != null && dialog.isShowing()) {
+                        dialog.dismiss();
+                    }
+                    Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
             }
         } else {
             showProgress();
@@ -83,8 +99,6 @@ public class MainActivity extends AppCompatActivity {
             intent.setComponent(new ComponentName("com.yuong.plugin", "com.yuong.plugin.PluginActivity"));
             startActivity(intent);
         }
-//        Intent intent = new Intent(this, TestActivity.class);
-//        startActivity(intent);
     }
 
     private void showProgress() {
