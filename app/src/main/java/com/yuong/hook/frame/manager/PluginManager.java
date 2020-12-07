@@ -1,15 +1,22 @@
 package com.yuong.hook.frame.manager;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Handler;
+import android.util.ArrayMap;
 import android.util.Log;
 
 import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 import dalvik.system.DexClassLoader;
 import dalvik.system.PathClassLoader;
@@ -26,6 +33,7 @@ public class PluginManager {
     private DexClassLoader dexClassLoader;
     private AssetManager assetManager;
     private Resources pluginResource;
+    private ArrayMap<String, List<ServiceInfo>> serviceInfoMap = new ArrayMap<>();
 
     private PluginManager(Context context) {
         this.context = context;
@@ -107,6 +115,8 @@ public class PluginManager {
 
                     //加载插件的资源
                     loadPluginResource(handler, path);
+                    //解析插件
+                    parsePlugin(path);
 
 
                 } catch (Exception e) {
@@ -128,15 +138,99 @@ public class PluginManager {
             Resources appResources = context.getResources();
             //实例化插件的Resources
             pluginResource = new Resources(assetManager, appResources.getDisplayMetrics(), appResources.getConfiguration());
-            if (dexClassLoader != null && pluginResource != null) {
+            if (dexClassLoader != null && pluginResource != null && handler != null) {
                 handler.sendEmptyMessage(666);
             } else {
-                handler.sendEmptyMessage(0);
+                if (handler != null) {
+                    handler.sendEmptyMessage(0);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
-            handler.sendEmptyMessage(0);
+            if (handler != null) {
+                handler.sendEmptyMessage(0);
+            }
         }
+    }
+
+    @SuppressLint("PrivateApi")
+    public void parsePlugin(String pluginPath) {
+        try {
+            File file = new File(pluginPath);
+            if (!file.exists()) {
+                Log.e(TAG, "插件不存在");
+                return;
+            }
+            //1、解析插件包  public Package parsePackage(File packageFile, int flags)
+            Class<?> mPackageParserClass = Class.forName("android.content.pm.PackageParser");
+            Object mPackageParser = mPackageParserClass.newInstance();
+            Method parsePackageMethod = mPackageParserClass.getMethod("parsePackage", File.class, int.class);
+            Object mPackage = parsePackageMethod.invoke(mPackageParser, file, PackageManager.GET_SERVICES);
+
+            //2、获取Package类下的   public final ArrayList<Activity> receivers = new ArrayList<Activity>(0); 广播集合
+            Field mReceiversField = mPackage.getClass().getDeclaredField("services");
+            ArrayList<Object> services = (ArrayList<Object>) mReceiversField.get(mPackage);
+
+            //3、遍历所有的Service
+            //Activity 该Activity 不是四大组件里面的activity，而是一个Java bean对象，用来封装清单文件中的activity和receiver
+            for (Object mService : services) {
+                Field infoFiled = mService.getClass().getDeclaredField("info");
+                infoFiled.setAccessible(true);
+                ServiceInfo serviceInfo = (ServiceInfo) infoFiled.get(mService);
+                List<ServiceInfo> serviceInfoList = serviceInfoMap.get(serviceInfo.packageName);
+                if (serviceInfoList == null) {
+                    serviceInfoList = new ArrayList<>();
+                    serviceInfoList.add(serviceInfo);
+                    serviceInfoMap.put(serviceInfo.packageName, serviceInfoList);
+                }
+                Log.d("yuongzw", serviceInfo.processName + ", " + serviceInfo.packageName);
+
+                //4、获取该广播的全类名 即 <service android:name=".PluginLocalService"/> android:name属性后面的值
+                //  /**
+                //     * Public name of this item. From the "android:name" attribute.
+                //     */
+                //    public String name;
+
+                // public static final ActivityInfo generateActivityInfo(Activity a, int flags,
+                //            PackageUserState state, int userId)
+
+//                public static final ServiceInfo generateServiceInfo(Service s, int flags,
+//                PackageUserState state, int userId)
+                //先获取到 ServiceInfo 类
+//                Class<?> mPackageUserStateClass = Class.forName("android.content.pm.PackageUserState");
+//                Object mPackageUserState = mPackageUserStateClass.newInstance();
+//
+//                Method generateActivityInfoMethod = mPackageParserClass.getMethod("generateActivityInfo", mActivity.getClass(),
+//                        int.class, mPackageUserStateClass, int.class);
+//                //获取userId
+//                Class<?> mUserHandleClass = Class.forName("android.os.UserHandle");
+//                //public static @UserIdInt int getCallingUserId()
+//                int userId = (int) mUserHandleClass.getMethod("getCallingUserId").invoke(null);
+//
+//                //执行此方法 由于是静态方法 所以不用传对象
+//                ServiceInfo serviceInfo = (ServiceInfo) generateActivityInfoMethod.invoke(null, mActivity, 0, mPackageUserState, userId);
+//                String receiverClassName = activityInfo.name;
+//                Class<?> receiverClass = getClassLoader().loadClass(receiverClassName);
+//                BroadcastReceiver receiver = (BroadcastReceiver) receiverClass.newInstance();
+//
+//                //5、获取 intent-filter  public final ArrayList<II> intents;这个是intent-filter的集合
+//                //静态内部类反射要用 $+类名
+//                //getField(String name)只能获取public的字段，包括父类的；
+//                //而getDeclaredField(String name)只能获取自己声明的各种字段，包括public，protected，private。
+//                Class<?> mComponentClass = Class.forName("android.content.pm.PackageParser$Component");
+//                Field intentsField = mActivity.getClass().getField("intents");
+//                ArrayList<IntentFilter> intents = (ArrayList<IntentFilter>) intentsField.get(mActivity);
+//                for (IntentFilter intentFilter : intents) {
+//                    //6、注册广播
+//                    context.registerReceiver(receiver, intentFilter);
+//                }
+
+            }
+
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 
     public Resources getResource() {

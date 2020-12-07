@@ -9,13 +9,20 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".PluginActivity">
+        <activity android:name=".PluginActivity"
+            android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".Plugin2Activity"/>
+        <service android:name=".PluginLocalService"/>
+        <service android:name=".PluginRemoteService"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":PluginRemoteService"/>
     </application>
 
 </manifest>

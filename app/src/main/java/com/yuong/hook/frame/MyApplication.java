@@ -6,14 +6,18 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
 import com.yuong.hook.frame.manager.HookManager;
 import com.yuong.hook.frame.manager.PluginManager;
 import com.yuong.hook.frame.proxy.ProxyActivity;
+
+import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -38,12 +42,13 @@ public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-
+        Log.d("yuongzw", "Application OnCreate");
         try {
             //先hook AMS检查
             HookManager.getInstance(this).hookAMSAction();
             //hook ActivityThread
             HookManager.getInstance(this).hookLaunchActivity();
+
         } catch (Exception e) {
 
         }

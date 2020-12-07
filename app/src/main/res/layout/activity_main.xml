@@ -23,4 +23,11 @@
         android:text="跳转插件Activity"
         android:onClick="jumpPlugin"/>
 
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:text="绑定Service"
+        android:onClick="bindLocalService"/>
+
 </LinearLayout>
