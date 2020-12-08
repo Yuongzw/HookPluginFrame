@@ -9,7 +9,6 @@ import androidx.core.content.ContextCompat;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
-import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -25,6 +24,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
+import com.yuong.hook.frame.manager.HookManager;
 import com.yuong.hook.frame.manager.PluginManager;
 import com.yuong.hook.frame.proxy.ProxyRemoteService;
 
@@ -69,10 +69,25 @@ public class MainActivity extends AppCompatActivity {
             if (ContextCompat.checkSelfPermission(this,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{ Manifest.permission.WRITE_EXTERNAL_STORAGE}, 666);
+                ActivityCompat.requestPermissions(this, new String[]{
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE}, 666);
             } else {
                 showProgress();
-                PluginManager.getInstance(this).pluginToApp(handler, path);
+                try {
+                    if (!MyApplication.isHookSystemApi) {
+                        HookManager.getInstance(getApplication()).hookAMSAction();
+                        HookManager.getInstance(getApplication()).hookLaunchActivity();
+                        MyApplication.isHookSystemApi = true;
+                    }
+                    PluginManager.getInstance(getApplication()).pluginToApp(handler, path);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    if (dialog != null && dialog.isShowing()) {
+                        dialog.dismiss();
+                    }
+                    Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
             }
         } else {
             showProgress();

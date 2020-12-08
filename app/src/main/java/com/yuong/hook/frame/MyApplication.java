@@ -3,21 +3,19 @@ package com.yuong.hook.frame;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Build;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 
 import com.yuong.hook.frame.manager.HookManager;
 import com.yuong.hook.frame.manager.PluginManager;
 import com.yuong.hook.frame.proxy.ProxyActivity;
-
-import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -32,7 +30,7 @@ import me.weishu.reflection.Reflection;
  * desc   :
  */
 public class MyApplication extends Application {
-
+    public static boolean isHookSystemApi = false;
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
@@ -42,15 +40,17 @@ public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d("yuongzw", "Application OnCreate");
-        try {
-            //先hook AMS检查
-            HookManager.getInstance(this).hookAMSAction();
-            //hook ActivityThread
-            HookManager.getInstance(this).hookLaunchActivity();
-
-        } catch (Exception e) {
-
+        int selfPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        if (selfPermission == PackageManager.PERMISSION_GRANTED) {
+            try {
+                //先hook AMS检查
+                HookManager.getInstance(this).hookAMSAction();
+                //hook ActivityThread
+                HookManager.getInstance(this).hookLaunchActivity();
+                isHookSystemApi = true;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 

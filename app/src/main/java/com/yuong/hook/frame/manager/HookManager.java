@@ -39,7 +39,7 @@ public class HookManager {
 
     public static HookManager getInstance(Context context) {
         if (instance == null) {
-            synchronized (PluginManager.class) {
+            synchronized (HookManager.class) {
                 if (instance == null) {
                     instance = new HookManager(context);
                 }

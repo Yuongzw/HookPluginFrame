@@ -8,19 +8,20 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 
 import com.yuong.plugin.base.BaseActivity;
 
 public class PluginActivity extends BaseActivity {
     private static final String TAG = "PluginActivity";
-
     private IBookInterface iBookInterface;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_plugin);
+        Log.d(TAG, "PluginActivity onCreate");
 
         findViewById(R.id.btn_starActivity).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -60,7 +61,30 @@ public class PluginActivity extends BaseActivity {
                 bindService(remoteService, connection, Context.BIND_AUTO_CREATE);
             }
         });
+    }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "PluginActivity onResume");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.d(TAG, "PluginActivity onPause");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.d(TAG, "PluginActivity onStop");
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "PluginActivity onDestroy");
     }
 
     ServiceConnection connection = new ServiceConnection() {
