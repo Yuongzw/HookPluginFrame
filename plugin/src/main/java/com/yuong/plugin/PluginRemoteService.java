@@ -34,6 +34,12 @@ public class PluginRemoteService extends Service {
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "PluginRemoteService onStartCommand....");
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "PluginRemoteService onDestroy....");

@@ -4,8 +4,14 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.ListView;
+import android.widget.SimpleAdapter;
 
 import com.yuong.plugin.base.BaseAppCompatActivity;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 public class Plugin2Activity extends BaseAppCompatActivity {
     private static final String TAG = "PluginActivity";

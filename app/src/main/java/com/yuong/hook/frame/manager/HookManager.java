@@ -1,25 +1,27 @@
 package com.yuong.hook.frame.manager;
 
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.AssetManager;
-import android.content.res.Resources;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
 import com.yuong.hook.frame.Constans;
+import com.yuong.hook.frame.MyApplication;
 import com.yuong.hook.frame.proxy.ProxyActivity;
-import com.yuong.hook.frame.proxy.ProxyLocalService;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -86,8 +88,13 @@ public class HookManager {
                             //做自己的业务逻辑
                             //换成可以通过AMS检测的Activity
                             Intent intent = new Intent(context, ProxyActivity.class);
-                            intent.putExtra("actonIntent", (Intent) args[3]);
-                            args[3] = intent;
+                            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
+                                intent.putExtra("actonIntent", (Intent) args[3]);
+                                args[3] = intent;
+                            } else {
+                                intent.putExtra("actonIntent", (Intent) args[2]);
+                                args[2] = intent;
+                            }
                         }
                         //让程序继续能够执行下去
                         return method.invoke(IActivityManager, args);
@@ -147,9 +154,6 @@ public class HookManager {
                         if ("startService".equals(method.getName())) {
                             //startService
                             int index = -1;
-                            String packageName = "com.yuong.hook.frame";
-                            String proxyServiceClassName = packageName + ".proxy.ProxyLocalService";
-                            Intent proxyIntent = null;
                             for (int i = 0; i < args.length; i++) {
                                 if (args[i] instanceof Intent) {
                                     index = i;
@@ -159,21 +163,13 @@ public class HookManager {
 
                             if (-1 != index) {
                                 Intent plugIntent = (Intent) args[index];
-                                if (!plugIntent.getBooleanExtra("isBind", false)) {
-                                    if (null != plugIntent.getComponent()) {
-                                        proxyIntent = new Intent();
-                                        proxyIntent.setClassName(packageName, proxyServiceClassName);
-                                        proxyIntent.putExtra("serviceIntent", plugIntent);
-                                    }
+                                if (!plugIntent.getBooleanExtra("isHand", false)) {
+                                    Intent proxyIntent = getProxyIntent(plugIntent, 1);
                                     //这里添加一个判断，防止类名写错时，导致args中的intent这个参数是null,导致崩溃
                                     args[index] = proxyIntent == null ? plugIntent : proxyIntent;
                                 }
                             }
-                        } else if ("bindIsolatedService".equals(method.getName())) {
-
-                            Bundle bundle = new Bundle();
-                            bundle.putBinder("connected", (IBinder) args[4]);
-
+                        } else if ("bindService".equals(method.getName()) || "bindIsolatedService".equals(method.getName())) {
                             // 找到参数里面的第一个Intent 对象
                             int index = -1;
                             for (int i = 0; i < args.length; i++) {
@@ -182,27 +178,19 @@ public class HookManager {
                                     break;
                                 }
                             }
-
-                            String packageName = "com.yuong.hook.frame";
-                            String proxyServiceClassName = packageName + ".proxy.ProxyRemoteService";
-                            Intent proxyIntent = null;
-
                             if (-1 != index) {
                                 Intent plugIntent = (Intent) args[index];
-                                if (null != plugIntent.getComponent()) {
-                                    proxyIntent = new Intent();
-                                    proxyIntent.setClassName(packageName, proxyServiceClassName);
-                                    proxyIntent.putExtra("serviceIntent", plugIntent);
-                                    proxyIntent.putExtra("isBind", true);
-                                    proxyIntent.putExtras(bundle);
-                                }
-                                //这里添加一个判断，防止类名写错时，导致args中的intent这个参数是null,导致崩溃
-//                                args[index] = proxyIntent == null ? plugIntent : proxyIntent;
-                                return context.startService(proxyIntent);
+                                Intent proxyIntent = getProxyIntent(plugIntent, 2);
+                                proxyIntent.putExtra("isHand", true);//是否手动
+                                Bundle bundle = new Bundle();
+                                bundle.putBinder("connected", (IBinder) args[4]);
+                                proxyIntent.putExtras(bundle);
+                                context.startService(proxyIntent);
+                                ServiceContainerManager.getInstance().putIntentByConnection((IBinder) args[4], plugIntent);
+                                return 1;
                             }
 
-                        }
-                        else if ("stopService".equals(method.getName())) {
+                        } else if ("stopService".equals(method.getName())) {
                             int index = -1;
                             for (int i = 0; i < args.length; i++) {
                                 if (args[i] instanceof Intent) {
@@ -212,8 +200,30 @@ public class HookManager {
                             }
                             if (index != -1) {
                                 Intent rawIntent = (Intent) args[index];
-                                return ProxyLocalService.stopPlugService(rawIntent);
+                                Intent intent = getProxyIntent(rawIntent, 3);
+                                intent.putExtra("isHand", true);//是否手动
+                                context.startService(intent);
+                                return 1;
                             }
+                        } else if ("stopServiceToken".equals(method.getName())) {
+                            ComponentName component = (ComponentName) args[0];
+                            //不是宿主APP的才进行处理
+                            List<ServiceInfo> serviceInfos = PluginManager.getInstance(MyApplication.getContext()).getServiceInfos(component.getClassName());
+                            if (serviceInfos != null && !serviceInfos.isEmpty()) {
+                                Intent target = new Intent().setComponent(component);
+                                Intent proxyIntent = getProxyIntent(target, 3);
+                                proxyIntent.putExtra("isHand", true);//是否手动
+                                context.startService(proxyIntent);
+                                return true;
+                            }
+                        } else if ("unbindService".equals(method.getName())) {
+                            IBinder iServiceConnection = (IBinder) args[0];
+                            Intent pluginIntent = ServiceContainerManager.getInstance().getIntentByConnection(iServiceConnection);
+
+                            Intent intent = getProxyIntent(pluginIntent, 4);
+                            intent.putExtra("isHand", true);//是否手动
+                            context.startService(intent);
+                            return true;
                         }
                         //让程序继续能够执行下去
                         return method.invoke(IActivityManager, args);
@@ -237,6 +247,31 @@ public class HookManager {
         mInstanceField.setAccessible(true);
         //将我们创建的动态代理设置到 mInstance 属性当中
         mInstanceField.set(mSingleton, mActivityManagerProxy);
+    }
+
+    /**
+     * 获取 代理的Intent
+     *
+     * @param pluginIntent 插件传过来的Intent
+     * @param actionMode   启动的模式
+     * @return
+     */
+    private Intent getProxyIntent(Intent pluginIntent, int actionMode) {
+        Intent intent = new Intent();
+        String packageName = "com.yuong.hook.frame";
+        String proxyServiceClassName = packageName + ".proxy.ProxyLocalService";
+        List<ServiceInfo> serviceInfos = PluginManager.getInstance(MyApplication.getContext()).getServiceInfos(pluginIntent.getComponent().getClassName());
+        String pluginServiceClassName = pluginIntent.getComponent().getClassName();
+        for (ServiceInfo serviceInfo : serviceInfos) {
+            if (serviceInfo.name.equals(pluginServiceClassName) && !TextUtils.isEmpty(serviceInfo.processName)) {
+                proxyServiceClassName = packageName + ".proxy.ProxyRemoteService";
+                break;
+            }
+        }
+        intent.setClassName(packageName, proxyServiceClassName);
+        intent.putExtra("actionMode", actionMode);
+        intent.putExtra("pluginIntent", pluginIntent);
+        return intent;
     }
 
 
@@ -301,6 +336,13 @@ public class HookManager {
                             //取出我们传递的值
                             Intent actonIntent = intent.getParcelableExtra("actonIntent");
                             if (actonIntent != null) {
+                                Field activityInfoFiled = mLaunchActivityItemClass.getDeclaredField("mInfo");
+                                activityInfoFiled.setAccessible(true);
+                                ActivityInfo activityInfo = (ActivityInfo) activityInfoFiled.get(mClientTransactionItem);
+                                int theme = context.getApplicationInfo().theme;
+                                if (theme != 0) {
+                                    activityInfo.theme = theme;
+                                }
                                 //替换掉原来的intent属性的值
                                 mIntentField.set(mClientTransactionItem, actonIntent);
                             }
@@ -333,6 +375,13 @@ public class HookManager {
                     //取出我们传递的值
                     Intent actonIntent = intent.getParcelableExtra("actonIntent");
                     if (actonIntent != null) {
+                        Field activityInfoFiled = msg.obj.getClass().getDeclaredField("activityInfo");
+                        activityInfoFiled.setAccessible(true);
+                        ActivityInfo activityInfo = (ActivityInfo) activityInfoFiled.get(msg.obj);
+                        int theme = context.getApplicationInfo().theme;
+                        if (theme != 0) {
+                            activityInfo.theme = theme;
+                        }
                         //替换掉原来的intent属性的值
                         intentField.set(msg.obj, actonIntent);
                     }

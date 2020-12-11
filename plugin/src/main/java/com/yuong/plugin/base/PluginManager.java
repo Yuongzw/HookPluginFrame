@@ -27,7 +27,7 @@ public class PluginManager {
     private DexClassLoader dexClassLoader;
     private AssetManager assetManager;
     private Resources pluginResource;
-    private String pluginPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "plugin2.apk";
+    private String pluginPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "plugin-debug.apk";
 
     private PluginManager(Context context) {
         this.context = context;
@@ -69,6 +69,7 @@ public class PluginManager {
     }
 
     public AssetManager getAssetManager() {
+        getResource();
         return assetManager;
     }
 }

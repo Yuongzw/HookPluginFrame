@@ -29,6 +29,21 @@ public class PluginLocalService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "PluginLocalService onStartCommand...");
+        Intent intent1 = new Intent("yuongzw");
+        sendBroadcast(intent1);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "延迟3s 结束Service");
+                    Thread.sleep(3000);
+                    Log.d(TAG, "结束Service");
+                    stopSelf();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
         return super.onStartCommand(intent, flags, startId);
     }
 

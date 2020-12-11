@@ -24,8 +24,6 @@
         <activity android:name=".proxy.ProxyActivity" />
         <service android:name=".proxy.ProxyLocalService"/>
         <service android:name=".proxy.ProxyRemoteService"
-            android:enabled="true"
-            android:exported="true"
             android:process=":remote"/>
     </application>
 

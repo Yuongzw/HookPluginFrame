@@ -76,11 +76,11 @@ public class MainActivity extends AppCompatActivity {
                 showProgress();
                 try {
                     if (!MyApplication.isHookSystemApi) {
-                        HookManager.getInstance(getApplication()).hookAMSAction();
-                        HookManager.getInstance(getApplication()).hookLaunchActivity();
+                        HookManager.getInstance(getApplicationContext()).hookAMSAction();
+                        HookManager.getInstance(getApplicationContext()).hookLaunchActivity();
                         MyApplication.isHookSystemApi = true;
                     }
-                    PluginManager.getInstance(getApplication()).pluginToApp(handler, path);
+                    PluginManager.getInstance(MyApplication.getContext()).pluginToApp(handler, path);
                 } catch (Exception e) {
                     e.printStackTrace();
                     if (dialog != null && dialog.isShowing()) {
@@ -91,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             showProgress();
-            PluginManager.getInstance(this).pluginToApp(handler, path);
+            PluginManager.getInstance(MyApplication.getContext()).pluginToApp(handler, path);
         }
 
     }
@@ -101,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "请先加载插件", Toast.LENGTH_SHORT).show();
         } else {
             Intent intent = new Intent();
+//            intent.setComponent(new ComponentName("com.dingli.pioneer", "com.dingli.pioneer.Main2Activity"));
             intent.setComponent(new ComponentName("com.yuong.plugin", "com.yuong.plugin.PluginActivity"));
             startActivity(intent);
         }
@@ -119,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void bindLocalService(View view) {
         Intent intent = new Intent(this, ProxyRemoteService.class);
-        bindService(intent, new ServiceConnection() {
+        boolean b = bindService(intent, new ServiceConnection() {
             @Override
             public void onServiceConnected(ComponentName name, IBinder service) {
                 Log.d("yuongzw", "service Connected");
